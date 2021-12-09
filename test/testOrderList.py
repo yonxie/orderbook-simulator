@@ -1,7 +1,7 @@
 import unittest
 
-from orderbook.src.common.order import Order
-from orderbook.src.common.orderList import OrderList
+from orderbook.order import LimitOrder
+from orderbook.orderList import OrderList
 
 
 class TestOrderList(unittest.TestCase):
@@ -14,7 +14,7 @@ class TestOrderList(unittest.TestCase):
         order_size = 7500
         order_list = OrderList()
         for i in range(0, num_elements):
-            order = Order(order_type, order_id, order_price, order_size, order_size)
+            order = LimitOrder(order_type, order_id, order_price, order_size)
             if order_list.tail is not None:
                 self.assertTrue(order_list.tail.id < order.id)
             order_list.add(order)
@@ -65,7 +65,7 @@ class TestOrderList(unittest.TestCase):
         order_list = OrderList()
         # Adding num_elements
         for i in range(0, num_elements):
-            order = Order(order_type, order_id, order_price, order_size)
+            order = LimitOrder(order_type, order_id, order_price, order_size)
             order_list.add(order)
             order_id += 1
         return order_list
