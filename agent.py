@@ -15,7 +15,7 @@ import scipy.stats as ss
 
 class Agent:
 
-    def __init__(self, side, seed, consensus_price, tick, max_tick_num, max_num):
+    def __init__(self, side, seed, consensus_price, max_size, tick, max_tick_num, max_num, price_vol=0.01):
         self.side = side
         self.generator = np.random.default_rng(seed)
         self.seed = seed
@@ -23,9 +23,39 @@ class Agent:
         self.tick = tick
         self.max_tick_num = max_tick_num
         self.max_num = max_num
+        self.max_size = max_size
         self.count = 0
+        self.price_vol = price_vol
+        self.tick_grid, self.tick_prob = self._discretize_price_probability()
+        self.size_grid, self.size_prob = self._discretize_size_probability()
 
-    def _discretize_probability(self):
+    def _simulate_price(self):
+        """
+        Simulate price for bid order of ask order
+        """
+
+        tick_num = np.random.choice(self.tick_grid, size=1, p=self.tick_prob)[0]
+        price = tick_num * self.tick + self.consensus_price
+        return price
+
+    def _simulate_size(self):
+        size = np.random.choice(self.size_grid, size=1, p=self.size_prob)
+        return size
+
+    def _discretize_size_probability(self):
+        """
+        Discretize probability for each size
+        """
+        size_grid = np.linspace(1, self.max_size, self.max_size)
+        lo = size_grid - 0.5
+        hi = size_grid + 0.5
+
+        prob = ss.gamma.cdf(hi, a=3, loc=1, scale=10) - ss.gamma.cdf(lo, a=3, loc=1, scale=10)
+        prob = prob / prob.sum()
+
+        return size_grid, prob
+
+    def _discretize_price_probability(self):
         """
         Discretize probability for each tick
         """
@@ -37,8 +67,8 @@ class Agent:
         lo = self.consensus_price + tick_grid * self.tick - self.tick * 0.5
         hi = self.consensus_price + tick_grid * self.tick + self.tick * 0.5
 
-        hi_prob = ss.norm.cdf(hi, scale=self.consensus_price / 30, loc=self.consensus_price)
-        lo_prob = ss.norm.cdf(lo, scale=self.consensus_price / 30, loc=self.consensus_price)
+        hi_prob = ss.norm.cdf(hi, scale=self.consensus_price * self.price_vol, loc=self.consensus_price)
+        lo_prob = ss.norm.cdf(lo, scale=self.consensus_price * self.price_vol, loc=self.consensus_price)
         prob = hi_prob - lo_prob
         prob = prob / prob.sum()
 
@@ -62,22 +92,12 @@ class BuyAgent(Agent):
 
     def __init__(self, side, seed, consensus_price, market_order_intensity,
                  limit_order_intensity, cancel_order_intensity,
-                 tick=0.01, max_tick_num=3000, max_num=None):
+                 tick=0.01, max_size=100, max_tick_num=3000, max_num=None, price_vol=0.01):
 
-        Agent.__init__(self, side, seed, consensus_price, tick, max_tick_num, max_num)
+        Agent.__init__(self, side, seed, consensus_price, max_size, tick, max_tick_num, max_num, price_vol)
         self.market_order_intensity = market_order_intensity
         self.limit_order_intensity = limit_order_intensity
         self.cancel_order_intensity = cancel_order_intensity
-        self.tick_grid, self.prob = self._discretize_probability()
-
-    def _simulate_price(self):
-        """
-        Simulate price for bid order of ask order
-        """
-
-        tick_num = np.random.choice(self.tick_grid, size=1, p=self.prob)[0]
-        price = tick_num * self.tick + self.consensus_price
-        return price
 
     def update_market_order_intensity(self, market_order_intensity):
         self.market_order_intensity = market_order_intensity
@@ -100,7 +120,7 @@ class BuyAgent(Agent):
         order_types = [0, 1, 2]
 
         order_type = np.random.choice(order_types, size=1, p=order_type_prob)[0]
-        size = 1
+        size = self._simulate_size()
         # generate orders, use fake id
         if order_type == 0:  # market order
             order = LimitOrder(self.side, 1, self.consensus_price + self.max_tick_num * self.tick, size)
@@ -122,22 +142,12 @@ class SellAgent(Agent):
 
     def __init__(self, side, seed, consensus_price, market_order_intensity,
                  limit_order_intensity, cancel_order_intensity,
-                 tick=0.01, max_tick_num=3000, max_num=None):
+                 tick=0.01, max_size=100, max_tick_num=3000, max_num=None, price_vol=0.01):
 
-        Agent.__init__(self, side, seed, consensus_price, tick, max_tick_num, max_num)
+        Agent.__init__(self, side, seed, consensus_price, max_size, tick, max_tick_num, max_num, price_vol)
         self.market_order_intensity = market_order_intensity
         self.limit_order_intensity = limit_order_intensity
         self.cancel_order_intensity = cancel_order_intensity
-        self.tick_grid, self.prob = self._discretize_probability()
-
-    def _simulate_price(self):
-        """
-        Simulate price for bid order of ask order
-        """
-
-        tick_num = np.random.choice(self.tick_grid, size=1, p=self.prob)[0]
-        price = tick_num * self.tick + self.consensus_price
-        return price
 
     def update_market_order_intensity(self, market_order_intensity):
         self.market_order_intensity = market_order_intensity
@@ -160,7 +170,7 @@ class SellAgent(Agent):
         order_types = [0, 1, 2]
 
         order_type = np.random.choice(order_types, size=1, p=order_type_prob)[0]
-        size = 1
+        size = self._simulate_size()
 
         # generate orders, use fake id
         if order_type == 0:  # market order
@@ -176,4 +186,3 @@ class SellAgent(Agent):
 
         self.count += 1
         return waiting_time, order
-

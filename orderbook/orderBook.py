@@ -5,9 +5,15 @@ from orderbook.order import CancelOrder, LimitOrder
 
 
 class OrderBook(object):
-    def __init__(self):
+    def __init__(self, log=True):
         self.bids = PriceTree('Bids')
         self.asks = PriceTree('Asks')
+        self.order_count = 0
+        self.trade_count = 0
+        self.is_log = log
+        self.sys_time = 0
+        if self.is_log:
+            self.book_log = {}
 
     def process_order(self, order):
         """
@@ -17,6 +23,22 @@ class OrderBook(object):
             trade = self._process_cancel_order(order)
         elif isinstance(order, LimitOrder):
             trade = self._process_limit_order(order)
+
+        self.trade_count += len(trade)
+        self.order_count += 1
+
+        if self.is_log:
+            self.book_log[self.order_count] = {
+                'timestamp': self.sys_time,
+                'best_bid': self.bids.max,
+                'best_ask': self.asks.min,
+                'trades': self.trade_count,
+                'orders': self.order_count,
+                'bid_depth': len(self.bids.price_map),
+                'ask_depth': len(self.asks.price_map),
+                'outstanding_bid': len(self.bids.order_map),
+                'outstanding_ask': len(self.asks.order_map)
+        }
 
         return trade
 

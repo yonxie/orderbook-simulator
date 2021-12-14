@@ -5,6 +5,8 @@
 @time: 12/8/2021 9:47 PM
 @Description: 
 """
+import json
+import numpy as np
 
 
 class UniqueIDGenerator:
@@ -21,3 +23,9 @@ class UniqueIDGenerator:
         self.cursor += 1
         return self.cursor - 1
 
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
